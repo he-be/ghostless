@@ -1,0 +1,131 @@
+{
+  "project_title": "Real Asset Test",
+  "scenes": [
+    {
+      "id": "001",
+      "type": "talk",
+      "text": "この動画では、今研究している読み上げソフトについて、動いているところを紹介するよ。",
+      "motion_tag": "greeting",
+      "intensity": "normal",
+      "image_file": "slide_001.png",
+      "voice_file": "audio-16.wav"
+    },
+    {
+      "id": "002",
+      "type": "talk",
+      "text": "このソフトは、ティーファイブジェマ　ティーティーエス　というAIモデルをもとに改造したものだよ。自宅のPCで動いていて、無料で使えるんだ。",
+      "motion_tag": "deny",
+      "intensity": "normal",
+      "image_file": "slide_002.png",
+      "voice_file": "audio-17.wav"
+    },
+    {
+      "id": "003",
+      "type": "talk",
+      "text": "リファレンス音声を入力したら、その音声を基にテキストを読み上げるよ。今は、僕の声をリファレンス音声として登録していて、再生するとこんな感じ。",
+      "motion_tag": "greeting",
+      "intensity": "normal",
+      "image_file": "slide_003.png",
+      "voice_file": "audio-18.wav"
+    },
+    {
+      "id": "004",
+      "type": "talk",
+      "text": "読み上げたい文章を入れて、読み上げの速度など、生成のためのパラメータを設定するよ。",
+      "motion_tag": "agree",
+      "intensity": "normal",
+      "image_file": "slide_004.png",
+      "voice_file": "audio-19.wav"
+    },
+    {
+      "id": "005",
+      "type": "talk",
+      "text": "生成ボタンを押すと、裏でAIが文章から感情表現や日本語の読み方などを推測して、音声を合成するよ。だいたい１分くらいかかるんだ。ちょっと待つね。",
+      "motion_tag": "deny",
+      "intensity": "normal",
+      "image_file": "slide_005.png",
+      "voice_file": "audio-20.wav"
+    },
+    {
+      "id": "006",
+      "type": "talk",
+      "text": "生成が完了したね。では一文ずつ聞いてチェックしていこう。AIはたまに読み方を間違えたりするから、人力で確認して修正するようになっているんだ。",
+      "motion_tag": "thinking",
+      "intensity": "normal",
+      "image_file": "slide_006.png",
+      "voice_file": "audio-21.wav"
+    },
+    {
+      "id": "007",
+      "type": "talk",
+      "text": "うん、だいたいいい感じだね！こんな風に、普通の文章をそのまま入力するだけで、一撃で正しいアクセントの読み上げを生成することができるよ。",
+      "motion_tag": "greeting",
+      "intensity": "normal",
+      "image_file": "slide_007.png",
+      "voice_file": "audio-22.wav"
+    },
+    {
+      "id": "008",
+      "type": "talk",
+      "text": "あれ？今、読み方がちょっとおかしかったような。再度生成するためにチェックを入れるよ。こうしてチェックを入れながら確認して、後でまとめて再生成するんだ。",
+      "motion_tag": "thinking",
+      "intensity": "normal",
+      "image_file": "slide_008.png",
+      "voice_file": "audio-23.wav"
+    },
+    {
+      "id": "009",
+      "type": "talk",
+      "text": "よし、一通り確認が終わったね。チェックを入れた文を、まとめて再生成しよう。だいたい３０秒くらい待つよ。",
+      "motion_tag": "deny",
+      "intensity": "normal",
+      "image_file": "slide_009.png",
+      "voice_file": "audio-24.wav"
+    },
+    {
+      "id": "010",
+      "type": "talk",
+      "text": "こうやって、生成された候補を聴き比べて、良いものを採用するんだ。入れ替えた音声は自動的に結合されるよ。",
+      "motion_tag": "greeting",
+      "intensity": "normal",
+      "image_file": "slide_010.png",
+      "voice_file": "audio-25.wav"
+    },
+    {
+      "id": "011",
+      "type": "talk",
+      "text": "では、修正が終わったね。完成した読み上げ音声を聞いてみよう。",
+      "motion_tag": "deny",
+      "intensity": "normal",
+      "image_file": "slide_011.png",
+      "voice_file": "audio-26.wav"
+    },
+    {
+      "id": "012",
+      "type": "talk",
+      "text": "完璧だね！今後は、AIが読みを間違えにくいように改善したり、より効率的に音声合成ができるように改良していきたいな。",
+      "motion_tag": "agree",
+      "intensity": "normal",
+      "image_file": "slide_012.png",
+      "voice_file": "audio-27.wav"
+    },
+    {
+      "id": "013",
+      "type": "talk",
+      "text": "このソフトを動かすには、ゲーミングPCが必要だよ。気になる人はセットアップして動かしてみてね。",
+      "motion_tag": "thinking",
+      "intensity": "normal",
+      "image_file": "slide_013.png",
+      "voice_file": "audio-28.wav"
+    },
+    {
+      "id": "014",
+      "type": "talk",
+      "text": "この動画はここまで。見てくれてありがとう！バイバーイ！",
+      "motion_tag": "greeting",
+      "intensity": "normal",
+      "image_file": "slide_014.png",
+      "voice_file": "audio-29.wav"
+    }
+  ]
+}

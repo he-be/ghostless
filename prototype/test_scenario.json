@@ -1,0 +1,32 @@
+{
+  "project_title": "Ghostless Prototype Test",
+  "scenes": [
+    {
+      "id": "001",
+      "type": "intro",
+      "text": "Hello, this is a test of the Ghostless automation system.",
+      "motion_tag": "greeting",
+      "intensity": "normal",
+      "image_file": "slide_001.png",
+      "voice_file": "voice_001.wav"
+    },
+    {
+      "id": "002",
+      "type": "explanation",
+      "text": "We are verifying the timing and motion triggers.",
+      "motion_tag": "agree",
+      "intensity": "high",
+      "image_file": "slide_002.png",
+      "voice_file": "voice_002.wav"
+    },
+    {
+      "id": "003",
+      "type": "outro",
+      "text": "Thank you for watching.",
+      "motion_tag": "greeting",
+      "intensity": "normal",
+      "image_file": "slide_003.png",
+      "voice_file": "voice_003.wav"
+    }
+  ]
+}

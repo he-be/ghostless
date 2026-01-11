@@ -1,0 +1,7 @@
+mido
+python-rtmidi
+sounddevice
+soundfile
+numpy
+moviepy
+obsws-python
