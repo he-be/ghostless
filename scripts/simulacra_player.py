@@ -12,116 +12,105 @@ BIND_IP = "127.0.0.1"
 BIND_PORT = 3910
 
 # Helper: Quaternion and Rotation logic
-def euler_to_quaternion(z, x, y, order='zxy'):
+def euler_to_quaternion(x, y, z, order='zxy'):
     """
     Convert Euler Angles (in degrees) to Quaternion (x, y, z, w)
-    BVH rotations are Euler angles.
     """
-    z = np.radians(z)
-    x = np.radians(x)
-    y = np.radians(y)
+    inputs = {'x': np.radians(x), 'y': np.radians(y), 'z': np.radians(z)}
     
-    cx = np.cos(x * 0.5)
-    sx = np.sin(x * 0.5)
-    cy = np.cos(y * 0.5)
-    sy = np.sin(y * 0.5)
-    cz = np.cos(z * 0.5)
-    sz = np.sin(z * 0.5)
+    # Calculate all sin/cos
+    cx = np.cos(inputs['x'] * 0.5)
+    sx = np.sin(inputs['x'] * 0.5)
+    cy = np.cos(inputs['y'] * 0.5)
+    sy = np.sin(inputs['y'] * 0.5)
+    cz = np.cos(inputs['z'] * 0.5)
+    sz = np.sin(inputs['z'] * 0.5)
     
-    # ZXY order (Common in BVH for Unity)
-    if order == 'zxy':
-        # q = qz * qx * qy
-        # qz = (0, 0, sz, cz)
-        # qx = (sx, 0, 0, cx)
-        # qy = (0, sy, 0, cy)
-        
-        # qzx = (sz*cx, -sz*sx, sz*cx + cz*0, cz*cx) ?? No, standard mult
-        
-        # Manual composition
-        # Qz * Qx
-        # w = cz*cx - sz*0 = cz*cx
-        # x = cz*sx + sz*0 = cz*sx
-        # y = cz*0 - sz*sx = -sz*sx
-        # z = cz*0 + sz*cx = sz*cx
-        
-        # (QzQx) * Qy
-        # w = (cz*cx)*cy - (cz*sx)*0 - (-sz*sx)*sy - (sz*cx)*0 
-        #   = cz*cx*cy + sz*sx*sy
-        
-        qw = cz*cx*cy - sz*sx*sy 
-        qx = cz*sx*cy - sz*cx*sy
-        qy = cz*cx*sy + sz*sx*cy
-        qz = sz*cx*cy + cz*sx*sy
-        
-        return qx, qy, qz, qw
-        
-    elif order == 'zyx':
-        # Standard ZYX
-        qw = cx*cy*cz + sx*sy*sz
-        qx = sx*cy*cz - cx*sy*sz
-        qy = cx*sy*cz + sx*cy*sz
-        qz = cx*cy*sz - sx*sy*cz
-        return qx, qy, qz, qw
+    qs = {}
+    qs['x'] = (sx, 0, 0, cx)
+    qs['y'] = (0, sy, 0, cy)
+    qs['z'] = (0, 0, sz, cz)
     
-    # Default fallback identity
-    return 0, 0, 0, 1
+    # Composition based on order (e.g. "zxy" -> Z * X * Y)
+    # q_combined = q1 * q2 * q3
+    # Function to multiply quats
+    def mul(q1, q2):
+        x1, y1, z1, w1 = q1
+        x2, y2, z2, w2 = q2
+        return (
+            w1*x2 + x1*w2 + y1*z2 - z1*y2,
+            w1*y2 - x1*z2 + y1*w2 + z1*x2,
+            w1*z2 + x1*y2 - y1*x2 + z1*w2,
+            w1*w2 - x1*x2 - y1*y2 - z1*z2
+        )
+    
+    # Parse order string, e.g. "zxy"
+    parts = list(order.lower()) # ['z', 'x', 'y']
+    
+    q_accum = qs[parts[0]]
+    q_accum = mul(q_accum, qs[parts[1]])
+    q_accum = mul(q_accum, qs[parts[2]])
+    
+    return q_accum[0], q_accum[1], q_accum[2], q_accum[3]
 
 # Unity HumanBodyBones Mapping
+# https://docs.unity3d.com/ScriptReference/HumanBodyBones.html
 BONE_MAP = {
-    "Hips": 0,
-    "LeftUpLeg": 1, "LeftThigh": 1,
-    "RightUpLeg": 2, "RightThigh": 2,
-    "LeftLeg": 3, "LeftShin": 3,
-    "RightLeg": 4, "RightShin": 4,
-    "LeftFoot": 5,
-    "RightFoot": 6,
-    "Spine": 7, "Spine1": 7,
-    "Chest": 8, "Spine2": 8,
-    "UpperChest": 9, "Spine3": 9, "Neck": 9, # Approximation if Bone mapping is tight. Some BVH have Spine1,2,3.
-    # Note: Neck is usually 9 in Unity HumanBodyBones? Verify index.
-    # Unity: 0-Hips, 1-LLeg, 2-RLeg, 3-LKnee, 4-RKnee, 5-LFoot, 6-RFoot, 7-Spine, 8-Chest, 9-Neck, 10-Head
-    # NOTE: Re-adjusted map based on Unity Enum standard.
-    "Neck": 9,
-    "Head": 10,
-    "LeftShoulder": 11, "LeftCollar": 11,
-    "RightShoulder": 12, "RightCollar": 12,
-    "LeftArm": 13, "LeftUpArm": 13, "LeftUpperArm": 13,
-    "RightArm": 14, "RightUpArm": 14, "RightUpperArm": 14,
-    "LeftForeArm": 15, "LeftLowerArm": 15,
-    "RightForeArm": 16, "RightLowerArm": 16,
-    "LeftHand": 17,
-    "RightHand": 18,
+    # Core
+    "Hips": 0, "hip": 0,
+    "Spine": 7, "Spine1": 7, "abdomen": 7,
+    "Chest": 8, "Spine2": 8, "chest": 8,
+    "UpperChest": 54, "Spine3": 54,
+    "Neck": 9, "neck": 9,
+    "Head": 10, "head": 10, 
+    
+    # Legs (Unity names vs BVH)
+    "LeftUpLeg": 1, "LeftThigh": 1, "lThigh": 1, 
+    "RightUpLeg": 2, "RightThigh": 2, "rThigh": 2,
+    "LeftLeg": 3, "LeftShin": 3, "lShin": 3,
+    "RightLeg": 4, "RightShin": 4, "rShin": 4,
+    "LeftFoot": 5, "lFoot": 5,
+    "RightFoot": 6, "rFoot": 6,
     "LeftToe": 19, "LeftToes": 19,
     "RightToe": 20, "RightToes": 20,
-    "LeftEye": 21,
-    "RightEye": 22,
+    
+    # Arms
+    "LeftShoulder": 11, "LeftCollar": 11, "lCollar": 11,
+    "RightShoulder": 12, "RightCollar": 12, "rCollar": 12,
+    "LeftArm": 13, "LeftUpArm": 13, "LeftUpperArm": 13, "lShldr": 13,
+    "RightArm": 14, "RightUpArm": 14, "RightUpperArm": 14, "rShldr": 14,
+    "LeftForeArm": 15, "LeftLowerArm": 15, "lForeArm": 15,
+    "RightForeArm": 16, "RightLowerArm": 16, "rForeArm": 16,
+    "LeftHand": 17, "lHand": 17,
+    "RightHand": 18, "rHand": 18,
+    
+    # Fingers
+    "LeftHandThumb1": 24, "LeftThumbProximal": 24, "lThumb1": 24,
+    "LeftHandIndex1": 27, "LeftIndexProximal": 27, "lIndex1": 27,
+    "LeftHandMiddle1": 30, "LeftMiddleProximal": 30, "lMid1": 30,
+    "LeftHandRing1": 33, "LeftRingProximal": 33, "lRing1": 33,
+    "LeftHandPinky1": 36, "LeftLittleProximal": 36, "lPinky1": 36,
+    
+    "RightHandThumb1": 39, "RightThumbProximal": 39, "rThumb1": 39,
+    "RightHandIndex1": 42, "RightIndexProximal": 42, "rIndex1": 42,
+    "RightHandMiddle1": 45, "RightMiddleProximal": 45, "rMid1": 45,
+    "RightHandRing1": 48, "RightRingProximal": 48, "rRing1": 48,
+    "RightHandPinky1": 51, "RightLittleProximal": 51, "rPinky1": 51,
+    
+    # Eyes
+    "LeftEye": 21, "leftEye": 21,
+    "RightEye": 22, "rightEye": 22,
     "Jaw": 23,
-    
-    # Fingers (Proximal)
-    "LeftHandThumb1": 24, "LeftThumbProximal": 24,
-    "LeftHandIndex1": 27, "LeftIndexProximal": 27,
-    "LeftHandMiddle1": 30, "LeftMiddleProximal": 30,
-    "LeftHandRing1": 33, "LeftRingProximal": 33,
-    "LeftHandPinky1": 36, "LeftLittleProximal": 36,
-    
-    "RightHandThumb1": 39, "RightThumbProximal": 39,
-    "RightHandIndex1": 42, "RightIndexProximal": 42,
-    "RightHandMiddle1": 45, "RightMiddleProximal": 45,
-    "RightHandRing1": 48, "RightRingProximal": 48,
-    "RightHandPinky1": 51, "RightLittleProximal": 51,
-    
-    # UpperChest (Unity 5.6+)
-    "UpperChest": 54
 }
 
 class BVHParser:
     def __init__(self, filepath):
         self.filepath = filepath
-        self.bones = [] # List of bone names in order of channel data
-        self.hierarchy = {} # name -> {offset, channels, parent}
+        self.bones = [] # List of {name, channels, order}
+        self.hierarchy = {} 
         self.frame_time = 0.033
-        self.frames = [] # List of numpy arrays
-        self.offsets = []
+        self.frames = [] 
+        self.scale_factor = 1.0
         
     def parse(self):
         with open(self.filepath, 'r') as f:
@@ -130,8 +119,6 @@ class BVHParser:
         iterator = iter(lines)
         current_bone = None
         parent_stack = []
-        
-        mode = "HIERARCHY"
         
         for line in iterator:
             if line.startswith("HIERARCHY"):
@@ -152,19 +139,28 @@ class BVHParser:
                 if parent_stack:
                     current_bone = parent_stack[-1]
             elif line.startswith("OFFSET"):
-                # We might need offsets for retargeting, but for simple rotation copying usually we interpret rotation only.
-                # Storing just in case.
                 pass
             elif line.startswith("CHANNELS"):
                 parts = line.split()
+                # Ex: CHANNELS 3 Zrotation Xrotation Yrotation
+                # Or: CHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation
                 count = int(parts[1])
                 channels = parts[2:]
+                
+                # Detect rotation order string, e.g. "zxy"
+                rot_order = ""
+                for c in channels:
+                    if "rotation" in c:
+                        rot_order += c[0].lower() # 'Zrotation' -> 'z'
+                
                 if current_bone and current_bone != "End Site":
                     self.hierarchy[current_bone]["channels"] = channels
-                    # For data parsing order
-                    self.bones.append({"name": current_bone, "channels": channels})
+                    self.bones.append({
+                        "name": current_bone, 
+                        "channels": channels,
+                        "rot_order": rot_order
+                    })
             elif line.startswith("MOTION"):
-                mode = "MOTION"
                 break
                 
         # Parse Motion Section
@@ -177,7 +173,6 @@ class BVHParser:
                 except:
                     pass
             else:
-                # Data line
                 try:
                     values = [float(x) for x in line.split()]
                     self.frames.append(values)
@@ -185,6 +180,18 @@ class BVHParser:
                     pass
                     
         print(f"Parsed BVH: {len(self.frames)} frames, {self.frame_time}s per frame.")
+        
+        # Auto-detect scale (Meters vs Cm) based on Hips position in first frame
+        if len(self.frames) > 0 and len(self.bones) > 0:
+            # Assuming first bone is Hips/Root with 6 channels
+            root_vals = self.frames[0][0:3] # X, Y, Z pos
+            magnitude = math.sqrt(sum(v*v for v in root_vals))
+            if magnitude > 10.0:
+                print(f"Large root position ({magnitude:.2f}), assuming CM. Scaling by 0.01.")
+                self.scale_factor = 0.01
+            else:
+                print(f"Small root position ({magnitude:.2f}), assuming Meters. Scale 1.0.")
+                self.scale_factor = 1.0
         
     def get_frame_packet_json(self, frame_idx):
         if frame_idx >= len(self.frames):
@@ -194,19 +201,17 @@ class BVHParser:
         data_ptr = 0
         
         packet_bones = []
-        
-        # Hips Position (Special handling)
         hips_pos = {"x": 0.0, "y": 0.0, "z": 0.0}
         
         for bone_info in self.bones:
             name = bone_info["name"]
             channels = bone_info["channels"]
+            rot_order = bone_info["rot_order"]
             
             # Extract channel values
             val_x_pos, val_y_pos, val_z_pos = 0, 0, 0
-            val_z_rot, val_x_rot, val_y_rot = 0, 0, 0
+            val_x_rot, val_y_rot, val_z_rot = 0, 0, 0
             
-            # Identify channel indices
             for ch in channels:
                 val = frame_data[data_ptr]
                 data_ptr += 1
@@ -214,51 +219,43 @@ class BVHParser:
                 if ch == "Xposition": val_x_pos = val
                 elif ch == "Yposition": val_y_pos = val
                 elif ch == "Zposition": val_z_pos = val
-                elif ch == "Zrotation": val_z_rot = val
                 elif ch == "Xrotation": val_x_rot = val
                 elif ch == "Yrotation": val_y_rot = val
+                elif ch == "Zrotation": val_z_rot = val
             
-            # Map to Unity Bone ID
-            # Simple fuzzy match or exact match from map
+            # Map to Unity ID
             unity_id = -1
             if name in BONE_MAP:
                 unity_id = BONE_MAP[name]
             else:
-                # Try stripping prefixes like "Mixamorig:"
                 clean_name = name.split(":")[-1]
                 if clean_name in BONE_MAP:
                     unity_id = BONE_MAP[clean_name]
             
-            # Special handling for Hips (Root) position
+            # Hips Position
             if unity_id == 0:
-                # Scaling factor? BVH units are often cm or inches. Unity is meters.
-                # Assuming cm -> meters: * 0.01
-                # But sometimes it's arbitrary.
-                # User's BVH seems like raw values.
-                # Let's try sending as is, or with simple scale.
-                # Unity assumes meters. If BVH is 90 (cm), sends 90m -> Huge.
-                # Let's start with 0.01 scale.
-                hips_pos = {"x": val_x_pos * -0.01, "y": val_y_pos * 0.01, "z": val_z_pos * 0.01} 
-                # Negate X for coordinate system conversion (Right-hand to Left-hand)?
+                # Apply scale and coordinate flip if necessary
+                # Unity: +Y Up, +Z Forward, +X Right (Left-Handed)
+                # BVH: Often +Y Up, +Z Forward, +X Right (Right-Handed?) -> usually involves X axis flip
+                hips_pos = {
+                    "x": val_x_pos * -self.scale_factor, # Flip X
+                    "y": val_y_pos * self.scale_factor,
+                    "z": val_z_pos * self.scale_factor
+                }
             
             if unity_id != -1:
-                # Convert Euler (Deg) to Quaternion
-                # Order is derived from channel order. "Zrotation Xrotation Yrotation" -> ZXY
-                # For simplicity, assuming ZXY for now as per common BVH.
-                qx, qy, qz, qw = euler_to_quaternion(val_z_rot, val_x_rot, val_y_rot, order='zxy')
+                # Euler to Quaternion with dynamic order
+                qx, qy, qz, qw = euler_to_quaternion(val_x_rot, val_y_rot, val_z_rot, order=rot_order)
                 
-                # Coordinate System Adjustment
-                # Unity (Left-Handed Y-Up) vs BVH (Right-Handed Y-Up often)
-                # Flip X and W usually corrects rotation? Or X and Y?
-                # A robust retargeting is complex. 
-                # Quick hack: Negate X and Z components of Euler or try different quaternion perm.
-                # Let's try standard conversion first.
-                
+                # Coordinate adjustment for Unity
+                # Attempt 2: Fix reversed front/back (X-axis).
+                # Previous: (-x, y, -z, w) -> Inverted X.
+                # New: (x, -y, -z, w) -> Kept X, Inverted Y and Z.
                 packet_bones.append({
                     "type": unity_id,
-                    "qt_x": -qx, # Try flipping X forhandedness
-                    "qt_y": qy,
-                    "qt_z": -qz, # Try flipping Z
+                    "qt_x": qx,
+                    "qt_y": -qy,
+                    "qt_z": -qz,
                     "qt_w": qw
                 })
 
