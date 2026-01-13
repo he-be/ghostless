@@ -1,5 +1,4 @@
-mido
-python-rtmidi
+python-osc
 sounddevice
 soundfile
 numpy

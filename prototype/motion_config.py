@@ -1,32 +1,45 @@
 """
-Motion Configuration Database
-Maps semantic motion tags to 3tene MIDI note numbers.
+Motion Configuration Module
+Maps semantic tags to OSC messages for Unity control.
 """
 
-# 3tene MIDI Note definitions
-# These are examples and should be adjusted to match the actual 3tene configuration.
-# Standard MIDI notes: C4 is 60.
+# Dictionary mapping semantic tags to a list of potential OSC actions.
+# Each action is a dict with:
+# - address: OSC address string
+# - value: Value to send (float/int/bool)
+# - duration: Duration to hold the state (optional, for discrete triggers) or transition time
 
 MOTION_DB = {
-    # 挨拶・導入 (Greetings / Intro)
-    "greeting": [60, 61],       # [Light Bow, Wave Hand]
-    
-    # 肯定・同意・強調 (Agree / Positive)
-    "agree": [62, 63, 64],      # [Nod, Hand on Chest, Emphasize]
-    
-    # 否定・困惑 (Deny / Negative)
-    "deny": [65, 66],           # [Shake Head, Shrug]
-    
-    # 思考・説明 (Thinking / Explaining)
-    "thinking": [67, 68],       # [Hand on Chin, Fold Arms]
-    
-    # 待機・ニュートラル (Neutral)
-    "neutral": [None]           # No specific motion command
-}
+    # Basic Expressions
+    "neutral": [
+        {"address": "/avatar/parameters/Expression", "value": 0}
+    ],
+    "joy": [
+        {"address": "/avatar/parameters/Expression", "value": 1} # Assuming 1 is Joy
+    ],
+    "angry": [
+        {"address": "/avatar/parameters/Expression", "value": 2} # Assuming 2 is Angry
+    ],
+    "sorrow": [
+        {"address": "/avatar/parameters/Expression", "value": 3} # Assuming 3 is Sorrow
+    ],
+    "fun": [
+        {"address": "/avatar/parameters/Expression", "value": 4} # Assuming 4 is Fun
+    ],
 
-# Intensity modifiers (Optional, for future expansion)
-INTENSITY_MAP = {
-    "low": 0,
-    "normal": 1,
-    "high": 2
+    # Motions / Gestures
+    "greeting": [
+        {"address": "/avatar/parameters/Gesture", "value": 1} # Wave or Bow
+    ],
+    "agree": [
+        {"address": "/avatar/parameters/Gesture", "value": 2} # Nod
+    ],
+    "deny": [
+        {"address": "/avatar/parameters/Gesture", "value": 3} # Head shake
+    ],
+    
+    # Pre-motions (preparation before speaking)
+    "pre_talk": [
+         {"address": "/avatar/parameters/Breath", "value": 1.0} # Inhale
+    ]
 }

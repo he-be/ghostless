@@ -1,53 +1,33 @@
 """
 Virtual Actor Control Module
-Handles MIDI communication with 3tene to control the avatar's expressions and motions.
+Handles OSC communication with Unity to control the avatar's expressions and motions.
 """
 
 import time
 import random
-import mido
+from pythonosc import udp_client
 
 from motion_config import MOTION_DB
 
 class VirtualActor:
-    def __init__(self, midi_port_name="IAC"):
+    def __init__(self, osc_ip="127.0.0.1", osc_port=9000):
         """
-        Initialize the VirtualActor.
+        Initialize the VirtualActor with OSC connection.
         
         Args:
-            midi_port_name (str): The partial name of the MIDI output port to use.
-                                  Defaults to "IAC" to catch "IAC Driver" or localized versions.
+            osc_ip (str): IP address of the Unity OSC receiver.
+            osc_port (int): Port of the Unity OSC receiver.
         """
-        self.midi_port_name = midi_port_name
-        self.output_port = None
-        self._connect_midi()
+        self.client = udp_client.SimpleUDPClient(osc_ip, osc_port)
+        print(f"[VirtualActor] OSC Client initialized at {osc_ip}:{osc_port}")
 
-    def _connect_midi(self):
-        """Attempts to open the specified MIDI output port."""
+    def _send_osc(self, address, value):
+        """Sends an OSC message."""
         try:
-            available_ports = mido.get_output_names()
-            print(f"Available MIDI ports: {available_ports}")
-            
-            # Simple matching logic
-            target_port = next((p for p in available_ports if self.midi_port_name in p), None)
-            
-            if target_port:
-                self.output_port = mido.open_output(target_port)
-                print(f"Connected to MIDI port: {target_port}")
-            else:
-                print(f"Warning: MIDI port '{self.midi_port_name}' not found. MIDI commands will be skipped.")
-                # We don't raise error to allow dry-run without MIDI setup
-                self.output_port = None
+            self.client.send_message(address, value)
+            print(f"[OSC] Sent {address}: {value}")
         except Exception as e:
-            print(f"Error connecting to MIDI: {e}")
-            self.output_port = None
-
-    def _send_note_on(self, note, velocity=100):
-        """Sends a Note On message."""
-        if self.output_port and note is not None:
-            msg = mido.Message('note_on', note=note, velocity=velocity)
-            self.output_port.send(msg)
-            print(f"[MIDI] Sent Note On: {note}")
+            print(f"[OSC] Error sending message: {e}")
 
     def perform_motion(self, tag, intensity="normal"):
         """
@@ -55,7 +35,6 @@ class VirtualActor:
         
         Args:
             tag (str): The semantic motion tag (e.g., "agree", "greeting").
-            intensity (str): The intensity level (currently unused logic, but reserved).
         """
         if tag not in MOTION_DB:
             print(f"[Actor] Unknown motion tag: {tag}")
@@ -66,32 +45,36 @@ class VirtualActor:
             return
 
         # Randomly select a motion from the candidates
-        note = random.choice(candidates)
+        action = random.choice(candidates)
         
-        if note is not None:
-            self._send_note_on(note)
-        else:
-            print(f"[Actor] Motion '{tag}' selected None (Neutral).")
+        address = action.get("address")
+        value = action.get("value")
+        
+        if address:
+            self._send_osc(address, value)
+            
+            # If there's a duration or reset logic needed, it could go here.
+            # For now, we assume stateful triggers or Unity handles the transition.
 
     def perform_pre_motion(self):
         """
-        Executes a 'pre-motion' (e.g., strict inhale or slight movement) before speaking.
-        For now, we simulate this with a specific 'breath' motion if mapped, 
-        or just a debug print.
+        Executes a 'pre-motion' (e.g., inhale) before speaking.
         """
-        # Example: Assume Note 100 is assigned to 'Inhale' expression/motion in 3tene
-        # self._send_note_on(100) 
-        print("[Actor] *Inerhales* (Pre-motion)")
+        # Look for a specific pre-talk config or default to something
+        if "pre_talk" in MOTION_DB:
+            self.perform_motion("pre_talk")
+        else:
+            print("[Actor] *Inhales* (Pre-motion - No OSC mapping)")
 
     def perform_micro_movement(self):
         """
         Executes a subtle micro-movement (blink, gaze shift) during idle times.
         """
-        # Logic to send minor MIDI CC or specific notes for blinks/eyes
-        # print("[Actor] *Micro movement*")
+        # Example: Send a random value to a 'MicroLook' parameter
+        # val = random.uniform(-0.1, 0.1)
+        # self._send_osc("/avatar/parameters/MicroLookX", val)
         pass
 
     def cleanup(self):
-        """Close MIDI port."""
-        if self.output_port:
-            self.output_port.close()
+        """Cleanup resources."""
+        pass
