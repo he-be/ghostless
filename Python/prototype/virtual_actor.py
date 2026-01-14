@@ -66,13 +66,22 @@ class VirtualActor:
         else:
             print("[Actor] *Inhales* (Pre-motion - No OSC mapping)")
 
+    def set_speaking(self, is_speaking):
+        """
+        Sets the speaking state of the avatar.
+        
+        Args:
+            is_speaking (bool): True if speaking, False otherwise.
+        """
+        val = 1.0 if is_speaking else 0.0
+        self._send_osc("/ghostless/control/speech", val)
+
     def perform_micro_movement(self):
         """
         Executes a subtle micro-movement (blink, gaze shift) during idle times.
         """
-        # Example: Send a random value to a 'MicroLook' parameter
-        # val = random.uniform(-0.1, 0.1)
-        # self._send_osc("/avatar/parameters/MicroLookX", val)
+        # In the new architecture, Unity handles micro-movements autonomously.
+        # This method can be used for higher-level 'Look At' shifts if needed.
         pass
 
     def cleanup(self):

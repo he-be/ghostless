@@ -15,19 +15,38 @@ def main():
     print("  2: Angry")
     print("  3: Sad (Sorrow)")
     print("  4: Relaxed (Fun)")
+    print("  s: Toggle Speech (Talk/Silent)")
     print("  q: Quit")
     
+    is_speaking = False
+
     while True:
         try:
-            key = input("Enter Command (0-4): ").strip()
+            key = input("Enter Command: ").strip()
             
             if key == 'q':
                 break
                 
-            if key in ['0', '1', '2', '3', '4']:
-                val = int(key)
-                print(f"Sending /avatar/parameters/Expression : {val}")
-                client.send_message("/avatar/parameters/Expression", val)
+            if key == '0':
+                client.send_message("/ghostless/state/emotion", "neutral")
+                print("Sent: neutral")
+            elif key == '1':
+                client.send_message("/ghostless/state/emotion", "joy")
+                print("Sent: joy")
+            elif key == '2':
+                client.send_message("/ghostless/state/emotion", "angry")
+                print("Sent: angry")
+            elif key == '3':
+                client.send_message("/ghostless/state/emotion", "sorrow")
+                print("Sent: sorrow")
+            elif key == '4':
+                client.send_message("/ghostless/state/emotion", "fun")
+                print("Sent: fun")
+            elif key == 's':
+                is_speaking = not is_speaking
+                val = 1.0 if is_speaking else 0.0
+                client.send_message("/ghostless/control/speech", val)
+                print(f"Sent: speech={val}")
             else:
                 print("Invalid key.")
                 

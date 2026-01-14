@@ -6,40 +6,45 @@ Maps semantic tags to OSC messages for Unity control.
 # Dictionary mapping semantic tags to a list of potential OSC actions.
 # Each action is a dict with:
 # - address: OSC address string
-# - value: Value to send (float/int/bool)
-# - duration: Duration to hold the state (optional, for discrete triggers) or transition time
+# - value: Value to send (float/int/string)
+# - duration: Duration to hold the state (optional)
 
 MOTION_DB = {
-    # Basic Expressions
+    # Basic Expressions (State Based)
     "neutral": [
-        {"address": "/avatar/parameters/Expression", "value": 0}
+        {"address": "/ghostless/state/emotion", "value": "neutral"}
     ],
     "joy": [
-        {"address": "/avatar/parameters/Expression", "value": 1} # Assuming 1 is Joy
+        {"address": "/ghostless/state/emotion", "value": "joy"}
     ],
     "angry": [
-        {"address": "/avatar/parameters/Expression", "value": 2} # Assuming 2 is Angry
+        {"address": "/ghostless/state/emotion", "value": "angry"}
     ],
     "sorrow": [
-        {"address": "/avatar/parameters/Expression", "value": 3} # Assuming 3 is Sorrow
+        {"address": "/ghostless/state/emotion", "value": "sorrow"}
     ],
     "fun": [
-        {"address": "/avatar/parameters/Expression", "value": 4} # Assuming 4 is Fun
+        {"address": "/ghostless/state/emotion", "value": "fun"}
+    ],
+    "surprise": [
+        {"address": "/ghostless/state/emotion", "value": "surprise"}
     ],
 
-    # Motions / Gestures
+    # Motions / Gestures (Trigger Based)
+    # Ideally simpler triggers, or mapped to specific logic in Unity
     "greeting": [
-        {"address": "/avatar/parameters/Gesture", "value": 1} # Wave or Bow
+        {"address": "/ghostless/trigger/gesture", "value": "bow"} 
     ],
     "agree": [
-        {"address": "/avatar/parameters/Gesture", "value": 2} # Nod
+        {"address": "/ghostless/trigger/gesture", "value": "nod"}
     ],
     "deny": [
-        {"address": "/avatar/parameters/Gesture", "value": 3} # Head shake
+        {"address": "/ghostless/trigger/gesture", "value": "shake"}
     ],
     
     # Pre-motions (preparation before speaking)
     "pre_talk": [
-         {"address": "/avatar/parameters/Breath", "value": 1.0} # Inhale
+         # Triggers Inhale behavior via Speaking State = True (will be set explicitly by Director too, but this acts as the 'cue')
+         {"address": "/ghostless/control/speech", "value": 1.0} 
     ]
 }

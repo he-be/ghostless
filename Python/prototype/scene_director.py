@@ -124,7 +124,13 @@ class SceneDirector:
             "time": audio_start_time
         })
         
+        # Set Speaking State ON
+        self.actor.set_speaking(True)
+        
         self._play_audio(voice_file)
+        
+        # Set Speaking State OFF
+        self.actor.set_speaking(False)
         
         # 4. Post-scene wait
         time.sleep(0.2)
@@ -132,6 +138,14 @@ class SceneDirector:
         print(f"--- Scene {scene_id} End ---\n")
 
 if __name__ == "__main__":
+    # Ensure paths are resolved relative to this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    default_scenario = os.path.join(script_dir, "test_scenario.json")
+    
     # Test run
-    director = SceneDirector("test_scenario.json")
-    director.run()
+    # If using CLI args, we might want to respect them, but for default test:
+    if os.path.exists(default_scenario):
+        director = SceneDirector(default_scenario, assets_dir=script_dir)
+        director.run()
+    else:
+        print(f"Error: Could not find scenario file at {default_scenario}")
