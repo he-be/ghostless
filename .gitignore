@@ -213,3 +213,10 @@ temp_*
 recording_log.json
 .DS_Store
 *TEMP_MPY*
+
+# Migration Cleanup
+Temp/
+Temp.meta
+*.pcap
+*.pcap.meta
+
