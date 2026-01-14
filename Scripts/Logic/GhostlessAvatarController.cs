@@ -217,8 +217,7 @@ namespace Ghostless
             float noiseRoll = (Mathf.PerlinNoise(0, t) - 0.5f) * 2.0f;
             float noisePitch = (Mathf.PerlinNoise(t, t) - 0.5f) * 2.0f;
 
-            // significantly INCREASED magnitude for visible shoulder movement
-            float baseMag = 6.0f; // Increased from 4.0f for stronger lateral shift
+            float baseMag = 2.0f; 
             float magnitude = baseMag * (0.5f + (_arousal * 0.5f));
             if (_isSpeaking) magnitude *= 1.2f; 
 
