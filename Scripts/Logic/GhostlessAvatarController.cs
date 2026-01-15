@@ -30,13 +30,19 @@ namespace Ghostless
         [SerializeField] private float _swaySpeed = 0.5f;
 
         [SerializeField] private bool _enableEyeWander = true;
-        [SerializeField] private float _eyeWanderAmount = 3.0f; // Degrees
+        [SerializeField] private float _eyeWanderAmount = 2.0f; // Degrees
         [SerializeField] private float _eyeWanderSpeed = 0.3f;
+
+        [Header("Debug")]
+        [SerializeField] private bool _debugSpeechOverride = false;
+        [SerializeField] private float _debugSpeechValue = 1.0f;
 
         [Header("State (ReadOnly)")]
         [SerializeField] private string _currentEmotion = "neutral";
         [SerializeField] private float _arousal = 0.5f; // 0.0 = sleep, 1.0 = excited
         [SerializeField] private bool _isSpeaking = false;
+
+        // ...
 
         // Internal State
         private float _breathTimer;
@@ -148,29 +154,10 @@ namespace Ghostless
         {
             if (_vrmInstance == null || _animator == null) return;
 
-            try 
-            {
-                UpdateBreathing();
-            }
-            catch (System.Exception e) { Debug.LogError($"[Ghostless] Error in UpdateBreathing: {e.Message}"); }
-
-            try
-            {
-                UpdateSway();
-            }
-            catch (System.Exception e) { Debug.LogError($"[Ghostless] Error in UpdateSway: {e.Message}"); }
-
-            try
-            {
-                UpdateEyeLook();
-            }
-            catch (System.Exception e) { Debug.LogError($"[Ghostless] Error in UpdateEyeLook: {e.Message}"); }
-            
-            try
-            {
-                UpdateArmMotion();
-            }
-            catch (System.Exception e) { Debug.LogError($"[Ghostless] Error in UpdateArmMotion: {e.Message}"); }
+            UpdateBreathing();
+            UpdateSway();
+            UpdateEyeLook();
+            UpdateArmMotion();
             
             // Apply Blink Logic (Override VRM)
             if (_faceMesh != null && _enableBlinking)
@@ -178,6 +165,8 @@ namespace Ghostless
                 if (_blinkLIndex != -1) _faceMesh.SetBlendShapeWeight(_blinkLIndex, _currentBlinkWeight);
                 if (_blinkRIndex != -1) _faceMesh.SetBlendShapeWeight(_blinkRIndex, _currentBlinkWeight);
             }
+            
+            UpdateHeadMotion();
         }
 
         private void UpdateBreathing()
@@ -207,6 +196,31 @@ namespace Ghostless
 
         private Quaternion _cumulativeBodySway = Quaternion.identity; // To track body lean for head stabilization
 
+        // Speech Dynamics - Head Specific
+        private float _headSaccadeTimer = 0f;
+        private Quaternion _headSaccadeOffset = Quaternion.identity;
+        private Quaternion _targetHeadSaccadeOffset = Quaternion.identity;
+        private Quaternion _smoothedHeadRot = Quaternion.identity; 
+        private float _headSaccadeSpeed = 2.0f;
+
+        private float GetSpeechIntensity()
+        {
+            if (_debugSpeechOverride) return Mathf.Clamp01(_debugSpeechValue);
+
+            if (_vrmInstance == null || _vrmInstance.Runtime == null) return 0f;
+
+            // Sum up vowel weights (0.0 - 1.0)
+            float intensity = 0f;
+            intensity += _vrmInstance.Runtime.Expression.GetWeight(ExpressionKey.CreateFromPreset(ExpressionPreset.aa));
+            intensity += _vrmInstance.Runtime.Expression.GetWeight(ExpressionKey.CreateFromPreset(ExpressionPreset.ih));
+            intensity += _vrmInstance.Runtime.Expression.GetWeight(ExpressionKey.CreateFromPreset(ExpressionPreset.ou));
+            intensity += _vrmInstance.Runtime.Expression.GetWeight(ExpressionKey.CreateFromPreset(ExpressionPreset.ee));
+            intensity += _vrmInstance.Runtime.Expression.GetWeight(ExpressionKey.CreateFromPreset(ExpressionPreset.oh));
+            
+            // Normalize/Clamp usually max is around 1.0 if only one vowel is active
+            return Mathf.Clamp01(intensity); 
+        }
+
         private void UpdateSway()
         {
             if (!_enableSway) return;
@@ -217,7 +231,7 @@ namespace Ghostless
             float noiseRoll = (Mathf.PerlinNoise(0, t) - 0.5f) * 2.0f;
             float noisePitch = (Mathf.PerlinNoise(t, t) - 0.5f) * 2.0f;
 
-            float baseMag = 2.0f; 
+            float baseMag = 0.6f; 
             float magnitude = baseMag * (0.5f + (_arousal * 0.5f));
             if (_isSpeaking) magnitude *= 1.2f; 
 
@@ -263,40 +277,90 @@ namespace Ghostless
             if (!head) return;
 
             // 1. Natural Head Drift (The independent head movement)
-            float t = Time.time * (_swaySpeed * 3.0f); 
-            // Reduced frequency slightly for more "deliberate" look vs "jittery"
+            // Restored to 1.0f (was damped to 0.2f). 
+            // This ensures the head isn't "dead" when silent, but still distinct from high-freq speech jitter.
+            float t = Time.time * (_swaySpeed * 1.0f); 
+            
             float driftYaw = (Mathf.PerlinNoise(t + 10, 0) - 0.5f) * 2.0f; 
             float driftPitch = (Mathf.PerlinNoise(0, t + 10) - 0.5f) * 2.0f;
             float driftRoll = (Mathf.PerlinNoise(t + 5, t + 5) - 0.5f) * 2.0f;
 
-            float driftMag = 2.0f * (1.0f + _arousal); 
+            float driftMag = 1.0f * (1.0f + _arousal); 
             
             Quaternion naturalDrift = Quaternion.Euler(driftPitch * driftMag * 0.5f, driftYaw * driftMag, driftRoll * driftMag * 0.3f);
 
-            // 2. Speaking Jitter / Vibration
+            // 2. Speech Dynamics (Vibration + Saccades)
             Quaternion speakJitter = Quaternion.identity;
-            if (_isSpeaking)
+            
+            // Check signal STRENGTH. 
+            // If we have LipSync signal (> 0.05), we are effectively speaking.
+            // We do NOT rely on _isSpeaking boolean, because LipSync determines physical mouth shape.
+            float signal = GetSpeechIntensity(); 
+            bool effectivelySpeaking = (signal > 0.05f) || _debugSpeechOverride;
+
+            if (effectivelySpeaking)
             {
-                float st = Time.time * 20.0f; // Snappier
-                float speakYaw = (Mathf.PerlinNoise(st, 0) - 0.5f) * 2.0f;
+                // Pure signal. 
+                float intensity = signal;
+                
+                // Reduced speed for Jitter (50%)
+                float st = Time.time * 12.5f; 
+                float speakYaw = (Mathf.PerlinNoise(st, 0) - 0.5f) * 1.0f;
                 float speakPitch = (Mathf.PerlinNoise(0, st) - 0.5f) * 2.0f;
                 float speakRoll = (Mathf.PerlinNoise(st, st) - 0.5f) * 2.0f;
 
-                float speakMag = 1.5f + (_arousal * 2.0f); 
+                // Reduced Magnitude (60% reduction -> 0.4x factor)
+                // Original was 3.0f * intensity. New is 1.2f * intensity.
+                float speakMag = (1.2f * intensity) + (_arousal * 0.5f * intensity);
                 speakJitter = Quaternion.Euler(speakPitch * speakMag, speakYaw * speakMag * 0.5f, speakRoll * speakMag * 0.5f);
+                
+                // B. Saccades (Glancing while talking)
+                // only trigger new saccades if we are actually making sound
+                _headSaccadeTimer -= Time.deltaTime;
+                if (_headSaccadeTimer <= 0)
+                {
+                    // New Event
+                    float rnd = Random.value;
+                    if (rnd < 0.4f) 
+                    {
+                        // Glance Side (Reduced Angle ~2 degrees, Frequency 1/4 -> Timer 4x)
+                        float angle = Random.Range(1.5f, 3.5f) * (Random.value > 0.5f ? 1f : -1f);
+                        _targetHeadSaccadeOffset = Quaternion.Euler(Random.Range(-0.5f, 0.5f), angle, Random.Range(-0.5f, 0.5f));
+                        _headSaccadeSpeed = 8.0f; // Reduced speed (50%)
+                        _headSaccadeTimer = Random.Range(2.0f, 6.0f); // Longer hold
+                    }
+                    else if (rnd < 0.6f) // Slightly reduced chance for nod
+                    {
+                        // Nod / Emphasis (Angle ~2 degrees)
+                        float angle = Random.Range(1.5f, 3.5f);
+                        _targetHeadSaccadeOffset = Quaternion.Euler(angle, Random.Range(-0.5f, 0.5f), 0);
+                        _headSaccadeSpeed = 10.0f; // Reduced speed
+                        _headSaccadeTimer = Random.Range(1.2f, 3.2f);
+                    }
+                    else
+                    {
+                        // Return to Center
+                        _targetHeadSaccadeOffset = Quaternion.identity;
+                        _headSaccadeSpeed = 2.0f; // Reduced speed
+                        _headSaccadeTimer = Random.Range(4.0f, 8.0f);
+                    }
+                }
+            }
+            else
+            {
+                // Not speaking (or silent pause): Return to center smoothly
+                _targetHeadSaccadeOffset = Quaternion.identity;
+                _headSaccadeSpeed = 2.0f;
             }
             
-            // 3. Stabilization (Counter-Rotation)
-            // If body leans Left (Roll -), Head must Roll (+) to stay level.
-            // "Partially" compensate so the head still leans slightly with the body (Natural).
-            // Factor 0.0 = Head locked to Body (Tilts with it)
-            // Factor 1.0 = Head perfect Gyro (Stays World Vertical)
-            // Factor 0.6 = Natural Human compensation
-            
+            _headSaccadeOffset = Quaternion.Slerp(_headSaccadeOffset, _targetHeadSaccadeOffset, Time.deltaTime * _headSaccadeSpeed);
+
+            // 3. Stabilization (Counter-Rotation) - Partial 60%
             Quaternion fullStabilization = Quaternion.Inverse(_cumulativeBodySway);
-            Quaternion partialStabilization = Quaternion.Slerp(Quaternion.identity, fullStabilization, 0.6f);
+            Quaternion partialStabilization = Quaternion.Slerp(Quaternion.identity, fullStabilization, 0.5f);
             
-            Quaternion targetRot = _initHeadRot * partialStabilization * naturalDrift * speakJitter;
+            // Combine: Stabilization -> Saccade -> Drift -> Jitter
+            Quaternion targetRot = _initHeadRot * partialStabilization * _headSaccadeOffset * naturalDrift * speakJitter;
 
             // Apply
             head.localRotation = targetRot;
@@ -408,7 +472,7 @@ namespace Ghostless
                      // Random point within range (Clamped 60% logic applied here in selection)
                      // Center bias: often near (0,0)
                      float rangeX = _eyeWanderAmount * 0.9f; // Yaw (reduced)
-                     float rangeY = _eyeWanderAmount * 1.0f; // Pitch
+                     float rangeY = _eyeWanderAmount * 0.6f; // Pitch (Reduced 40%)
                      
                      // Box-muller gaussian or just simple random?
                      // Simple random is fine, maybe slightly biased to center
@@ -417,7 +481,7 @@ namespace Ghostless
                      float wY = (Random.value - 0.5f) * 2.0f * rangeX; // Yaw
 
                      _targetGazePoint = new Vector3(wX, wY, 0);
-                     _saccadeTimer = Random.Range(0.2f, 1.5f); // Fixation duration
+                     _saccadeTimer = Random.Range(0.8f, 6.0f); // Reduced freq (4x duration)
                 }
                 else if (_gazeState == GazeState.Glance)
                 {
@@ -425,7 +489,7 @@ namespace Ghostless
                     // Add slight noise
                     float n = (Random.value - 0.5f) * 2.0f;
                     _targetGazePoint = new Vector3(5.0f + n, -15.0f + n, 0);
-                    _saccadeTimer = Random.Range(0.5f, 1.0f);
+                    _saccadeTimer = Random.Range(2.0f, 4.0f); // Reduced freq (4x duration)
                 }
                 else if (_gazeState == GazeState.Scan)
                 {
@@ -444,14 +508,14 @@ namespace Ghostless
                         currentY = Random.Range(5.0f, 9.0f);
                         // Maybe change line (Pitch)
                         _targetGazePoint = new Vector3(Random.Range(-2f, 2f), currentY, 0);
-                        _saccadeTimer = 0.4f; // Return sweep takes time? Or instant?
+                        _saccadeTimer = 0.8f; // Slowed return
                     }
                     else
                     {
                         // Jump Right
                         currentY -= Random.Range(2.0f, 4.0f); 
                         _targetGazePoint = new Vector3(_targetGazePoint.x + Random.Range(-0.5f,0.5f), currentY, 0);
-                        _saccadeTimer = Random.Range(0.15f, 0.3f); // Fast reading fixations
+                        _saccadeTimer = Random.Range(0.3f, 0.6f); // Slowed reading
                     }
                 }
             }
